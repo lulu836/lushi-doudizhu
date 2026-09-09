@@ -1184,7 +1184,7 @@ button.primary {
               <i>三</i><b id="score2">0</b>
             </span>
           </div>
-          <div class="version-tag">v17</div>
+          <div class="version-tag">v18</div>
         </div>
 
         <div class="side right" id="player3Side">
@@ -2140,7 +2140,30 @@ button.primary {
   let ctx = null;
   let master = null;
   let muted = false;
+  let zhVoice = null;
   const playedLog = [];
+
+  /** 缓存中文语音(语音列表异步加载) */
+  function warmupVoice() {
+    if (!("speechSynthesis" in window)) return;
+    try {
+      const vs = window.speechSynthesis.getVoices();
+      zhVoice = vs.find((v) => v.lang === "zh-CN")
+        || vs.find((v) => v.lang && v.lang.indexOf("zh") === 0)
+        || null;
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.onvoiceschanged = warmupVoice;
+    } catch (e) {
+      /* ignore */
+    }
+    warmupVoice();
+  }
 
   try {
     muted = localStorage.getItem("ddz-muted") === "1";
@@ -2250,6 +2273,9 @@ button.primary {
 
   function toggleMute() {
     muted = !muted;
+    if (muted) {
+      try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+    }
     try {
       localStorage.setItem("ddz-muted", muted ? "1" : "0");
     } catch (e) {
@@ -2261,9 +2287,27 @@ button.primary {
   /** 任意用户手势时调用，解锁 AudioContext */
   function unlock() {
     ensure();
+    warmupVoice();
   }
 
-  DDZ.audio = { play, toggleMute, unlock, isMuted: () => muted, playedLog };
+  /** 语音播报:叫分、出牌牌型、不出等(用系统中文语音) */
+  function speak(text) {
+    if (muted || !text) return;
+    if (!("speechSynthesis" in window)) return;
+    try {
+      const synth = window.speechSynthesis;
+      synth.cancel(); // 新播报打断上一条,避免排队
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "zh-CN";
+      if (zhVoice) u.voice = zhVoice;
+      u.rate = 0.95;
+      synth.speak(u);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  DDZ.audio = { play, speak, toggleMute, unlock, isMuted: () => muted, playedLog };
 })(typeof window !== "undefined" ? window : globalThis);
 
 </script>
@@ -2851,12 +2895,14 @@ button.primary {
       DDZ.ui.showBidBubble(player.id, `叫 ${want} 分！`);
       DDZ.ui.showActionBadge(player.id, `叫 ${want} 分`, "bid");
       DDZ.audio.play("bid");
+      DDZ.audio.speak(`叫${want}分`);
     } else {
       bid.consecutivePasses++;
       addLog(`${player.name} 不叫`);
       DDZ.ui.showBidBubble(player.id, "不叫");
       DDZ.ui.showActionBadge(player.id, "不叫", "pass");
       DDZ.audio.play("pass");
+      DDZ.audio.speak("不叫");
     }
     bid.turn = (bid.turn + 1) % 3;
     DDZ.ui.renderAll();
@@ -2873,6 +2919,7 @@ button.primary {
     addLog(`你叫 ${score} 分`);
     DDZ.ui.showActionBadge(0, `叫 ${score} 分`, "bid");
     DDZ.audio.play("bid");
+    DDZ.audio.speak(`叫${score}分`);
     state.bid.turn = 1;
     DDZ.ui.renderAll();
     schedule(bidStep, 500);
@@ -2884,6 +2931,7 @@ button.primary {
     addLog("你不叫");
     DDZ.ui.showActionBadge(0, "不叫", "pass");
     DDZ.audio.play("pass");
+    DDZ.audio.speak("不叫");
     state.bid.turn = (state.bid.turn + 1) % 3;
     DDZ.ui.renderAll();
     schedule(bidStep, 500);
@@ -2935,6 +2983,30 @@ button.primary {
     schedule(aiTurn, 750); // AI 思考片刻后出牌
   }
 
+  /** 出牌牌型的播报文本:单张报点数(大王/小王)、对几、三带一、顺子等 */
+  function patternSpeech(pattern) {
+    const c = pattern.cards[0];
+    switch (pattern.type) {
+      case "single":
+        if (c.rank === "BJ") return "小王";
+        if (c.rank === "RJ") return "大王";
+        return c.rank;
+      case "pair": return `对${c.rank}`;
+      case "triple": return `三张${c.rank}`;
+      case "triple_single": return "三带一";
+      case "triple_pair": return "三带二";
+      case "straight": return "顺子";
+      case "double_sequence": return "连对";
+      case "plane": return "飞机";
+      case "plane_single": return "飞机带单";
+      case "plane_pair": return "飞机带对";
+      case "four_two": return "四带二";
+      case "bomb": return "炸弹";
+      case "rocket": return "王炸";
+      default: return "";
+    }
+  }
+
   function buildCtx(player) {
     return {
       me: player.id,
@@ -2961,6 +3033,7 @@ button.primary {
     addLog(`${player.name} 出牌[${DDZ.rules.patternName(pattern.type, pattern.wings)}]：${pattern.cards.map((c) => DDZ.card.text(c)).join(" ")}`);
     DDZ.ui.showActionBadge(playerId, "出牌", "play");
     DDZ.audio.play(pattern.type === "bomb" ? "bomb" : pattern.type === "rocket" ? "rocket" : "card");
+    DDZ.audio.speak(patternSpeech(pattern));
     DDZ.ui.animatePlay(pattern);
     if (player.hand.length === 0) {
       endRound(playerId);
@@ -3012,6 +3085,7 @@ button.primary {
     DDZ.ui.showActionBadge(0, "不出", "pass");
     DDZ.ui.clearLastPlay(0); // 不出 = 桌面上没牌
     DDZ.audio.play("pass");
+    DDZ.audio.speak("不出");
     advanceTurn();
   }
 
@@ -3058,6 +3132,7 @@ button.primary {
       DDZ.ui.showActionBadge(player.id, "不出", "pass");
       DDZ.ui.clearLastPlay(player.id); // 不出 = 桌面上没牌
       DDZ.audio.play("pass");
+      DDZ.audio.speak("不出");
       advanceTurn();
       return;
     }
@@ -3100,8 +3175,8 @@ button.primary {
 
     const humanWon = (state.players[0].isLandlord && landlordWon) || (!state.players[0].isLandlord && !landlordWon);
     addLog(`本局结束：${state.players[winnerId].name} 胜出（${landlordWon ? "地主" : "农民"}方），总倍数 ×${multiplier}`);
-    if (m.spring) addLog("春天！农民整局未出牌");
-    if (m.antiSpring) addLog("反春！地主只出过一手牌");
+    if (m.spring) { addLog("春天！农民整局未出牌"); DDZ.audio.speak("春天"); }
+    if (m.antiSpring) { addLog("反春！地主只出过一手牌"); DDZ.audio.speak("反春"); }
     DDZ.audio.play(humanWon ? "win" : "lose");
     DDZ.ui.renderAll();
     DDZ.ui.showSettlementModal(breakdown, humanWon);
