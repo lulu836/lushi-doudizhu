@@ -898,6 +898,66 @@ button.primary {
   animation: flipIn 0.45s ease both;
 }
 
+/* 玩家行动标识:叫分金色 / 出牌深蓝 / 不出焦糖橘 */
+.action-badge {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  z-index: 6;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px rgba(43, 78, 110, 0.3);
+  pointer-events: none;
+}
+
+.player-mini .action-badge {
+  top: auto;
+  bottom: 3px;
+  right: 3px;
+  font-size: 0.68rem;
+  padding: 2px 7px;
+}
+
+.action-badge.bid {
+  background: linear-gradient(135deg, #ffe9a8, #f7c04a);
+  color: #7a4a00;
+}
+
+.action-badge.play {
+  background: linear-gradient(180deg, #2b78b5, #276ea6);
+  color: #fff;
+}
+
+.action-badge.pass {
+  background: linear-gradient(135deg, #f5a25c, #e07b32);
+  color: #fff;
+}
+
+/* 炸弹/双王:该玩家出的牌抖一下 */
+.play-shake .card {
+  animation: cardShake 0.5s ease;
+}
+
+@keyframes cardShake {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  15% { transform: translate(-4px, 2px) rotate(-2deg); }
+  30% { transform: translate(4px, -3px) rotate(2deg); }
+  45% { transform: translate(-3px, 1px) rotate(-1.5deg); }
+  60% { transform: translate(3px, -2px) rotate(1deg); }
+  75% { transform: translate(-2px, 1px) rotate(-0.5deg); }
+}
+
+/* 版本标记(确认是否看到最新版) */
+.version-tag {
+  font-size: 0.62rem;
+  color: var(--ink-faint);
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
 /* 叫分气泡 */
 .bid-bubble {
   position: absolute;
@@ -1103,6 +1163,7 @@ button.primary {
               <i>三</i><b id="score2">0</b>
             </span>
           </div>
+          <div class="version-tag">v6</div>
         </div>
 
         <div class="side right" id="player3Side">
@@ -2435,6 +2496,10 @@ button.primary {
     hiddenRevealed = false;
     savedHidden = null;
     Object.keys(lastPlayByPlayer).forEach((k) => delete lastPlayByPlayer[k]);
+    el.panels.forEach((panel) => {
+      const badge = panel.querySelector(".action-badge");
+      if (badge) badge.remove();
+    });
   }
 
   // ---------- 触屏滑动选牌 ----------
@@ -2514,8 +2579,11 @@ button.primary {
 
     area.addEventListener("click", (e) => {
       if (suppressTrailingClick) {
+        // 滑动松手后的尾随点击:无论落在哪张牌上都拦掉
+        // (手指抬离时可能停在相邻牌上,只拦"最后一张"会误选邻居)
+        // 你的下一次点击会先触发 touchstart,拦截已被清除,不会误伤
         const cardEl = e.target.closest(".card");
-        if (cardEl && cardEl.dataset.cardId === suppressTrailingClick.cardId) {
+        if (cardEl) {
           e.stopPropagation();
           e.preventDefault();
         }
@@ -2527,9 +2595,17 @@ button.primary {
   // ---------- 动画与特效 ----------
 
   function animatePlay(pattern) {
-    // 出牌不抖动：牌面直接出现，不做逐张入场动画
-    if (pattern.type === "bomb") bombEffect(false);
-    if (pattern.type === "rocket") bombEffect(true);
+    // 炸弹/双王:该玩家出的牌抖一下;普通出牌无动画
+    if (pattern.type === "bomb" || pattern.type === "rocket") {
+      const area = pattern.player === 0
+        ? el.humanPlayArea
+        : pattern.player === 1 ? el.player2Play : el.player3Play;
+      area.classList.remove("play-shake");
+      void area.offsetWidth;
+      area.classList.add("play-shake");
+      setTimeout(() => area.classList.remove("play-shake"), 600);
+      bombEffect(pattern.type === "rocket");
+    }
   }
 
   function bombEffect(isRocket) {
@@ -2551,6 +2627,20 @@ button.primary {
     bubble.textContent = text;
     panel.appendChild(bubble);
     setTimeout(() => bubble.remove(), 1300);
+  }
+
+  /** 玩家行动标识:贴在每位玩家面板角上,保留到下一次行动
+      kind: bid(叫分·金色) / play(出牌·深蓝) / pass(不出·焦糖橘) */
+  function showActionBadge(playerId, text, kind) {
+    const panel = el.panels[playerId];
+    if (!panel) return;
+    let badge = panel.querySelector(".action-badge");
+    if (!badge) {
+      badge = document.createElement("div");
+      panel.appendChild(badge);
+    }
+    badge.className = "action-badge " + kind;
+    badge.textContent = text;
   }
 
   function showToast(text) {
@@ -2604,6 +2694,7 @@ button.primary {
     resetRound,
     animatePlay,
     showBidBubble,
+    showActionBadge,
     showToast,
     updateSoundBtn,
     showSettlementModal,
@@ -2724,11 +2815,13 @@ button.primary {
       state.baseScore = want;
       addLog(`${player.name} 叫 ${want} 分`);
       DDZ.ui.showBidBubble(player.id, `叫 ${want} 分！`);
+      DDZ.ui.showActionBadge(player.id, `叫 ${want} 分`, "bid");
       DDZ.audio.play("bid");
     } else {
       bid.consecutivePasses++;
       addLog(`${player.name} 不叫`);
       DDZ.ui.showBidBubble(player.id, "不叫");
+      DDZ.ui.showActionBadge(player.id, "不叫", "pass");
       DDZ.audio.play("pass");
     }
     bid.turn = (bid.turn + 1) % 3;
@@ -2744,6 +2837,7 @@ button.primary {
     state.bid.consecutivePasses = 0;
     state.baseScore = score;
     addLog(`你叫 ${score} 分`);
+    DDZ.ui.showActionBadge(0, `叫 ${score} 分`, "bid");
     DDZ.audio.play("bid");
     state.bid.turn = 1;
     DDZ.ui.renderAll();
@@ -2754,6 +2848,7 @@ button.primary {
     if (state.phase !== "bidding" || state.bid.turn !== 0 || state.autoPlay) return;
     state.bid.consecutivePasses++;
     addLog("你不叫");
+    DDZ.ui.showActionBadge(0, "不叫", "pass");
     DDZ.audio.play("pass");
     state.bid.turn = (state.bid.turn + 1) % 3;
     DDZ.ui.renderAll();
@@ -2830,6 +2925,7 @@ button.primary {
     if (pattern.type === "rocket") state.multiplier.rocket = true;
     DDZ.ai.updateMemory(state.memory, pattern.cards);
     addLog(`${player.name} 出牌[${DDZ.rules.patternName(pattern.type, pattern.wings)}]：${pattern.cards.map((c) => DDZ.card.text(c)).join(" ")}`);
+    DDZ.ui.showActionBadge(playerId, "出牌", "play");
     DDZ.audio.play(pattern.type === "bomb" ? "bomb" : pattern.type === "rocket" ? "rocket" : "card");
     DDZ.ui.animatePlay(pattern);
     if (player.hand.length === 0) {
@@ -2874,6 +2970,7 @@ button.primary {
     if (state.phase !== "playing" || state.currentTurn !== 0 || state.autoPlay) return;
     if (!state.lastPlay || state.lastPlay.player === 0) return; // 领出不能不要
     addLog("你不要");
+    DDZ.ui.showActionBadge(0, "不出", "pass");
     DDZ.audio.play("pass");
     advanceTurn();
   }
@@ -2918,6 +3015,7 @@ button.primary {
       : DDZ.ai.decideFollow(player.hand, state.lastPlay, ctx);
     if (!move) {
       addLog(`${player.name} 不出`);
+      DDZ.ui.showActionBadge(player.id, "不出", "pass");
       DDZ.audio.play("pass");
       advanceTurn();
       return;
