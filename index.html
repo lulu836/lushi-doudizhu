@@ -326,8 +326,7 @@ body {
   overflow: hidden;
 }
 
-/* 「路氏斗地主」作为背景的一部分：固定居中、不可移动，
-   圆润粗体、柔边、无描边无投影、泡泡感、蓝色渐变若隐若现 */
+/* 「路氏斗地主」嵌入桌面：色调融入桌面蓝、浮雕凹凸感，固定不可移动 */
 .game-title {
   position: absolute;
   top: 50%;
@@ -344,12 +343,15 @@ body {
   line-height: 1.12;
   letter-spacing: 4px;
   text-indent: 4px;
-  background: linear-gradient(180deg, #57a5e6 0%, #2f7fc4 55%, #1d4e77 100%);
+  background: linear-gradient(180deg, #5d8bb0 0%, #3a6a92 55%, #27506f 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  animation: titleBreathe 3.2s ease-in-out infinite;
+  /* 浮雕感:左上亮边 + 右下暗边,像刻进桌面 */
+  filter: drop-shadow(1px 1px 0 rgba(255, 255, 255, 0.55))
+          drop-shadow(-1px -1px 0 rgba(15, 40, 65, 0.28));
+  animation: titleBreathe 4s ease-in-out infinite;
 }
 
 .game-title .title-top {
@@ -1171,7 +1173,7 @@ button.primary {
               <i>三</i><b id="score2">0</b>
             </span>
           </div>
-          <div class="version-tag">v8</div>
+          <div class="version-tag">v9</div>
         </div>
 
         <div class="side right" id="player3Side">
