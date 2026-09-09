@@ -1173,7 +1173,7 @@ button.primary {
               <i>三</i><b id="score2">0</b>
             </span>
           </div>
-          <div class="version-tag">v9</div>
+          <div class="version-tag">v10</div>
         </div>
 
         <div class="side right" id="player3Side">
@@ -2403,6 +2403,12 @@ button.primary {
     hiddenRevealed = true;
   }
 
+  /** 玩家叫"不出"时清空其出牌区:空桌面即"不出"的视觉信号 */
+  function clearLastPlay(playerId) {
+    delete lastPlayByPlayer[playerId];
+    renderLastPlay();
+  }
+
   /** 每位玩家的出牌贴靠各自区域，保留到其下次出牌 */
   function renderLastPlay() {
     const state = stateRef();
@@ -2705,6 +2711,7 @@ button.primary {
     animatePlay,
     showBidBubble,
     showActionBadge,
+    clearLastPlay,
     showToast,
     updateSoundBtn,
     showSettlementModal,
@@ -2986,6 +2993,7 @@ button.primary {
     if (!state.lastPlay || state.lastPlay.player === 0) return; // 领出不能不要
     addLog("你不要");
     DDZ.ui.showActionBadge(0, "不出", "pass");
+    DDZ.ui.clearLastPlay(0); // 不出 = 桌面上没牌
     DDZ.audio.play("pass");
     advanceTurn();
   }
@@ -3031,6 +3039,7 @@ button.primary {
     if (!move) {
       addLog(`${player.name} 不出`);
       DDZ.ui.showActionBadge(player.id, "不出", "pass");
+      DDZ.ui.clearLastPlay(player.id); // 不出 = 桌面上没牌
       DDZ.audio.play("pass");
       advanceTurn();
       return;
