@@ -160,7 +160,7 @@ body {
   transform: translateX(-50%);
   min-width: 0;
   padding: 2px 9px;
-  font-size: 0.78rem;
+  font-size: 1.05rem;
   font-weight: 800;
   background: linear-gradient(135deg, #ffe9a8, #f7c04a);
   border: 1px solid rgba(176, 122, 20, 0.4);
@@ -170,6 +170,14 @@ body {
 
 .player-mini .player-tag:empty {
   display: none;
+}
+
+/* 皇冠单独放大 */
+.crown {
+  display: inline-block;
+  font-size: 1.35em;
+  line-height: 1;
+  margin-right: 2px;
 }
 
 /* AI 手牌：一张牌背 + 剩牌数 */
@@ -1163,7 +1171,7 @@ button.primary {
               <i>三</i><b id="score2">0</b>
             </span>
           </div>
-          <div class="version-tag">v6</div>
+          <div class="version-tag">v7</div>
         </div>
 
         <div class="side right" id="player3Side">
@@ -2417,10 +2425,10 @@ button.primary {
     const state = stateRef();
     state.players.forEach((player, i) => {
       const tag = i === 0 ? el.player1Tag : i === 1 ? el.player2Tag : el.player3Tag;
-      // 你的面板显示完整称号，顶部对手面板只显示皇冠徽标
-      tag.textContent = i === 0
-        ? (player.isLandlord ? "👑 地主" : "农民")
-        : (player.isLandlord ? "👑" : "");
+      // 你的面板显示完整称号，顶部对手面板只显示皇冠徽标；皇冠单独放大
+      tag.innerHTML = i === 0
+        ? (player.isLandlord ? '<span class="crown">👑</span>地主' : "农民")
+        : (player.isLandlord ? '<span class="crown">👑</span>' : "");
       tag.classList.toggle("is-landlord", player.isLandlord);
     });
   }
