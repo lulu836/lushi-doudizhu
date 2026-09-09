@@ -227,17 +227,9 @@ body {
   margin-right: 0;
 }
 
+/* 右侧与左侧叠放方式完全一致(牌角都可见),仅整体靠右贴边 */
 .side.right .side-play {
-  flex-direction: row-reverse;
-}
-
-.side.right .side-play .card {
-  margin-right: 0;
-  margin-left: -14px;
-}
-
-.side.right .side-play .card:last-child {
-  margin-left: 0;
+  justify-content: flex-end;
 }
 
 /* 小牌面的字号缩放 */
