@@ -2464,7 +2464,7 @@ button.primary {
   // 起始牌已选中→本次划动取消,未选中→本次划动选中。
   // 滑动期间只改牌面样式(不重画,不卡顿),松手时一次性同步游戏状态。
   let swipeState = null;
-  let suppressClick = null;
+  let suppressTrailingClick = null; // { cardId } 只拦滑动结束后的尾随点击
 
   function toggleCardEl(cardEl, select) {
     if (cardEl.classList.contains("selected") !== select) {
@@ -2488,6 +2488,8 @@ button.primary {
     }
 
     area.addEventListener("touchstart", (e) => {
+      // 新手势开始,清除上一次滑动留下的拦截
+      suppressTrailingClick = null;
       const state = stateRef();
       if (state.phase !== "playing" || state.currentTurn !== 0 || state.autoPlay) return;
       const cardEl = e.target.closest(".card");
@@ -2525,21 +2527,21 @@ button.primary {
         // 松手:按牌面实际状态一次性同步,只重画一次
         const ids = [...area.querySelectorAll(".card.selected")].map((c) => c.dataset.cardId);
         if (DDZ.game && DDZ.game.setSelectedCards) DDZ.game.setSelectedCards(ids);
-        // 只拦截"最后一张被划过的牌"的尾随点击(350ms),不误伤后续操作
-        suppressClick = { cardId: swipeState.lastId, until: Date.now() + 350 };
+        // 只拦滑动自身产生的尾随点击;下一次手指按下会立即解除,不误伤后续点选
+        suppressTrailingClick = { cardId: swipeState.lastId };
       }
       swipeState = null;
       lastPos = null;
     });
 
     area.addEventListener("click", (e) => {
-      if (suppressClick && Date.now() < suppressClick.until) {
+      if (suppressTrailingClick) {
         const cardEl = e.target.closest(".card");
-        if (cardEl && cardEl.dataset.cardId === suppressClick.cardId) {
+        if (cardEl && cardEl.dataset.cardId === suppressTrailingClick.cardId) {
           e.stopPropagation();
           e.preventDefault();
-          suppressClick = null;
         }
+        suppressTrailingClick = null; // 只拦一次
       }
     }, true);
   }
