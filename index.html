@@ -2461,21 +2461,32 @@ button.primary {
 
   // ---------- 触屏滑动选牌 ----------
   // 手指划过几张选几张;再划过这几张就取消。
-  // 起始牌已选中→本次划动取消,未选中→本次划动选中
+  // 起始牌已选中→本次划动取消,未选中→本次划动选中。
+  // 滑动期间只改牌面样式(不重画,不卡顿),松手时一次性同步游戏状态。
   let swipeState = null;
-  let suppressNextClick = false;
+  let suppressClick = null;
 
-  function applySwipeToggle(cardId, mode) {
-    const state = stateRef();
-    const selected = state.selectedCards.some((s) => s.id === cardId);
-    const want = mode === "select";
-    if (selected !== want && DDZ.game && DDZ.game.toggleSelectCard) {
-      DDZ.game.toggleSelectCard(cardId);
+  function toggleCardEl(cardEl, select) {
+    if (cardEl.classList.contains("selected") !== select) {
+      cardEl.classList.toggle("selected", select);
     }
   }
 
   function bindTouchHandlers() {
     const area = el.player1Hand;
+    let lastPos = null;
+
+    function touchAt(x, y) {
+      const el = document.elementFromPoint(x, y);
+      const cardEl = el && el.closest(".card");
+      if (!cardEl || !cardEl.dataset.cardId) return;
+      const id = cardEl.dataset.cardId;
+      swipeState.lastId = id;
+      if (swipeState.toggled.has(id)) return;
+      swipeState.toggled.add(id);
+      toggleCardEl(cardEl, swipeState.mode === "select");
+    }
+
     area.addEventListener("touchstart", (e) => {
       const state = stateRef();
       if (state.phase !== "playing" || state.currentTurn !== 0 || state.autoPlay) return;
@@ -2483,41 +2494,52 @@ button.primary {
       if (!cardEl || !cardEl.dataset.cardId) return;
       const id = cardEl.dataset.cardId;
       const mode = cardEl.classList.contains("selected") ? "deselect" : "select";
-      swipeState = { mode, startId: id, toggled: new Set([id]), moved: false };
+      // 集合初始为空:手指划到哪张牌,哪张牌才切换(包括起始牌)
+      swipeState = { mode, toggled: new Set(), lastId: id };
+      lastPos = null;
     }, { passive: true });
 
     area.addEventListener("touchmove", (e) => {
       if (!swipeState) return;
       e.preventDefault(); // 防止页面手势干扰划牌
       const touch = e.touches[0];
-      const el = document.elementFromPoint(touch.clientX, touch.clientY);
-      const cardEl = el && el.closest(".card");
-      if (!cardEl || !cardEl.dataset.cardId) return;
-      const id = cardEl.dataset.cardId;
-      if (swipeState.toggled.has(id)) return;
-      if (!swipeState.moved) {
-        // 真正开始滑动时,先切换起始牌
-        swipeState.moved = true;
-        applySwipeToggle(swipeState.startId, swipeState.mode);
+      if (lastPos) {
+        // 在两次采样点之间插值,快速滑动也不漏牌
+        const dist = Math.abs(touch.clientX - lastPos.x) + Math.abs(touch.clientY - lastPos.y);
+        const steps = Math.max(1, Math.min(14, Math.round(dist / 6)));
+        for (let i = 1; i <= steps; i++) {
+          touchAt(
+            lastPos.x + (touch.clientX - lastPos.x) * i / steps,
+            lastPos.y + (touch.clientY - lastPos.y) * i / steps
+          );
+        }
+      } else {
+        touchAt(touch.clientX, touch.clientY);
       }
-      swipeState.toggled.add(id);
-      applySwipeToggle(id, swipeState.mode);
+      lastPos = { x: touch.clientX, y: touch.clientY };
     }, { passive: false });
 
     area.addEventListener("touchend", () => {
-      if (swipeState && swipeState.moved) {
-        // 滑动结束后抑制随后的 click,避免最后一张牌被二次切换
-        suppressNextClick = true;
-        setTimeout(() => { suppressNextClick = false; }, 500);
+      if (!swipeState) return;
+      if (swipeState.toggled.size > 0) {
+        // 松手:按牌面实际状态一次性同步,只重画一次
+        const ids = [...area.querySelectorAll(".card.selected")].map((c) => c.dataset.cardId);
+        if (DDZ.game && DDZ.game.setSelectedCards) DDZ.game.setSelectedCards(ids);
+        // 只拦截"最后一张被划过的牌"的尾随点击(350ms),不误伤后续操作
+        suppressClick = { cardId: swipeState.lastId, until: Date.now() + 350 };
       }
       swipeState = null;
+      lastPos = null;
     });
 
     area.addEventListener("click", (e) => {
-      if (suppressNextClick) {
-        e.stopPropagation();
-        e.preventDefault();
-        suppressNextClick = false;
+      if (suppressClick && Date.now() < suppressClick.until) {
+        const cardEl = e.target.closest(".card");
+        if (cardEl && cardEl.dataset.cardId === suppressClick.cardId) {
+          e.stopPropagation();
+          e.preventDefault();
+          suppressClick = null;
+        }
       }
     }, true);
   }
@@ -2848,6 +2870,16 @@ button.primary {
     DDZ.ui.renderAll();
   }
 
+  /** 触屏滑动选牌松手时,一次性同步选中状态(ui.js 调用,入参为牌 id 数组) */
+  function setSelectedCards(ids) {
+    if (state.phase !== "playing" || state.currentTurn !== 0 || state.autoPlay) return;
+    const hand = state.players[0].hand;
+    state.selectedCards = (ids || [])
+      .map((id) => hand.find((c) => c.id === id))
+      .filter(Boolean);
+    DDZ.ui.renderAll();
+  }
+
   function playSelectedCards() {
     if (state.phase !== "playing" || state.currentTurn !== 0 || state.autoPlay) return;
     const selected = [...state.selectedCards];
@@ -3089,7 +3121,7 @@ button.primary {
   // ---------- 启动 ----------
 
   DDZ.state = state;
-  DDZ.game = { initGame, addLog, toggleSelectCard };
+  DDZ.game = { initGame, addLog, toggleSelectCard, setSelectedCards };
 
   bindEvents();
   DDZ.rules.selfTest(); // 页面加载自动跑牌型自测（结果输出到 console）
