@@ -1171,7 +1171,7 @@ button.primary {
               <i>三</i><b id="score2">0</b>
             </span>
           </div>
-          <div class="version-tag">v7</div>
+          <div class="version-tag">v8</div>
         </div>
 
         <div class="side right" id="player3Side">
@@ -2906,7 +2906,7 @@ button.primary {
     if (state.phase !== "playing") return;
     const p = state.players[state.currentTurn];
     if (p.isHuman) { DDZ.ui.renderAll(); return; }
-    schedule(aiTurn, 1500); // 玩家二/三出牌前停顿 1.5 秒
+    schedule(aiTurn, 750); // AI 思考片刻后出牌
   }
 
   function buildCtx(player) {
@@ -2940,7 +2940,12 @@ button.primary {
       endRound(playerId);
       return;
     }
-    advanceTurn();
+    if (playerId !== 0 && !state.autoPlay) {
+      // 玩家二/三出牌后停顿 2.5 秒,让玩家看清出的牌
+      schedule(advanceTurn, 2500);
+    } else {
+      advanceTurn();
+    }
   }
 
   function toggleSelectCard(cardId) {
