@@ -562,6 +562,9 @@ body {
   align-items: center;
   gap: 0;
   padding: 8px 2px 2px;
+  touch-action: none; /* 支持手划动选牌,防止浏览器手势干扰 */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .hand-row {
@@ -2226,6 +2229,7 @@ button.primary {
   function createCardEl(card, width, height) {
     const div = document.createElement("div");
     div.className = "card";
+    div.dataset.cardId = card.id;
     if (card.suit === "♥" || card.suit === "♦") div.classList.add("red");
     if (card.rank === "BJ") div.classList.add("small-joker");
     if (card.rank === "RJ") div.classList.add("big-joker");
@@ -2452,6 +2456,69 @@ button.primary {
     Object.keys(lastPlayByPlayer).forEach((k) => delete lastPlayByPlayer[k]);
   }
 
+  // ---------- 触屏滑动选牌 ----------
+  // 手指划过几张选几张;再划过这几张就取消。
+  // 起始牌已选中→本次划动取消,未选中→本次划动选中
+  let swipeState = null;
+  let suppressNextClick = false;
+
+  function applySwipeToggle(cardId, mode) {
+    const state = stateRef();
+    const selected = state.selectedCards.some((s) => s.id === cardId);
+    const want = mode === "select";
+    if (selected !== want && DDZ.game && DDZ.game.toggleSelectCard) {
+      DDZ.game.toggleSelectCard(cardId);
+    }
+  }
+
+  function bindTouchHandlers() {
+    const area = el.player1Hand;
+    area.addEventListener("touchstart", (e) => {
+      const state = stateRef();
+      if (state.phase !== "playing" || state.currentTurn !== 0 || state.autoPlay) return;
+      const cardEl = e.target.closest(".card");
+      if (!cardEl || !cardEl.dataset.cardId) return;
+      const id = cardEl.dataset.cardId;
+      const mode = cardEl.classList.contains("selected") ? "deselect" : "select";
+      swipeState = { mode, startId: id, toggled: new Set([id]), moved: false };
+    }, { passive: true });
+
+    area.addEventListener("touchmove", (e) => {
+      if (!swipeState) return;
+      e.preventDefault(); // 防止页面手势干扰划牌
+      const touch = e.touches[0];
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      const cardEl = el && el.closest(".card");
+      if (!cardEl || !cardEl.dataset.cardId) return;
+      const id = cardEl.dataset.cardId;
+      if (swipeState.toggled.has(id)) return;
+      if (!swipeState.moved) {
+        // 真正开始滑动时,先切换起始牌
+        swipeState.moved = true;
+        applySwipeToggle(swipeState.startId, swipeState.mode);
+      }
+      swipeState.toggled.add(id);
+      applySwipeToggle(id, swipeState.mode);
+    }, { passive: false });
+
+    area.addEventListener("touchend", () => {
+      if (swipeState && swipeState.moved) {
+        // 滑动结束后抑制随后的 click,避免最后一张牌被二次切换
+        suppressNextClick = true;
+        setTimeout(() => { suppressNextClick = false; }, 500);
+      }
+      swipeState = null;
+    });
+
+    area.addEventListener("click", (e) => {
+      if (suppressNextClick) {
+        e.stopPropagation();
+        e.preventDefault();
+        suppressNextClick = false;
+      }
+    }, true);
+  }
+
   // ---------- 动画与特效 ----------
 
   function animatePlay(pattern) {
@@ -2523,6 +2590,7 @@ button.primary {
   }
 
   cache();
+  bindTouchHandlers();
 
   DDZ.ui = {
     el,
