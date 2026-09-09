@@ -152,7 +152,7 @@ body {
   line-height: 1.1;
 }
 
-/* 迷你面板里的地主小皇冠（农民不显示） */
+/* 迷你面板的身份标签:地主金冠 / 农民绿标 */
 .player-mini .player-tag {
   position: absolute;
   top: -8px;
@@ -162,14 +162,23 @@ body {
   padding: 2px 9px;
   font-size: 1.05rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #ffe9a8, #f7c04a);
-  border: 1px solid rgba(176, 122, 20, 0.4);
-  color: #7a4a00;
   box-shadow: 0 3px 8px rgba(43, 78, 110, 0.25);
 }
 
 .player-mini .player-tag:empty {
   display: none;
+}
+
+.player-mini .player-tag.is-landlord {
+  background: linear-gradient(135deg, #ffe9a8, #f7c04a);
+  border: 1px solid rgba(176, 122, 20, 0.4);
+  color: #7a4a00;
+}
+
+.player-mini .player-tag:not(.is-landlord) {
+  background: rgba(79, 168, 126, 0.92);
+  border: 1px solid rgba(47, 138, 98, 0.8);
+  color: #fff;
 }
 
 /* 皇冠单独放大 */
@@ -1173,7 +1182,7 @@ button.primary {
               <i>三</i><b id="score2">0</b>
             </span>
           </div>
-          <div class="version-tag">v10</div>
+          <div class="version-tag">v11</div>
         </div>
 
         <div class="side right" id="player3Side">
@@ -2433,10 +2442,10 @@ button.primary {
     const state = stateRef();
     state.players.forEach((player, i) => {
       const tag = i === 0 ? el.player1Tag : i === 1 ? el.player2Tag : el.player3Tag;
-      // 你的面板显示完整称号，顶部对手面板只显示皇冠徽标；皇冠单独放大
+      // 你的面板显示完整称号；顶部对手面板:地主显皇冠、农民显"农民"
       tag.innerHTML = i === 0
         ? (player.isLandlord ? '<span class="crown">👑</span>地主' : "农民")
-        : (player.isLandlord ? '<span class="crown">👑</span>' : "");
+        : (player.isLandlord ? '<span class="crown">👑</span>' : "农民");
       tag.classList.toggle("is-landlord", player.isLandlord);
     });
   }
