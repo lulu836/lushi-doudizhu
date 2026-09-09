@@ -227,7 +227,7 @@ body {
   align-items: flex-start;
   min-height: 64px;
   max-width: 100%;
-  margin-top: 18px;
+  margin-top: 4px; /* 紧贴各自面板下方 */
 }
 
 .side-play .card {
@@ -237,7 +237,7 @@ body {
   padding: 3px 3px 2px;
   border-radius: 8px;
   box-shadow: 0 3px 6px rgba(43, 78, 110, 0.18);
-  margin-right: -14px;
+  margin-right: -10px; /* 错落但不过度挤压 */
 }
 
 .side-play .card:last-child {
@@ -328,7 +328,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* 出牌显示在上方,标题在下方 */
+  justify-content: flex-end; /* 你的出牌紧贴你的面板上方 */
   gap: 6px;
   padding: 4px 12px 2px;
   min-height: 0;
@@ -336,11 +336,11 @@ body {
 }
 
 /* 「路氏斗地主」嵌入桌面：色调融入桌面蓝、浮雕凹凸感，
-   固定在牌的下方(贴中部区域底边)，不可移动 */
+   固定在两侧出牌的下方(贴中部区域顶边)，不可移动 */
 .game-title {
   position: absolute;
-  top: auto;
-  bottom: 6px;
+  top: 6px;
+  bottom: auto;
   left: 50%;
   transform: translateX(-50%);
   margin: 0;
@@ -437,7 +437,7 @@ body {
   width: 48px;
   height: 68px;
   flex-shrink: 0;
-  margin-right: -14px;
+  margin-right: -10px; /* 错落但不过度挤压 */
 }
 
 .human-play .card:last-child {
@@ -1184,7 +1184,7 @@ button.primary {
               <i>三</i><b id="score2">0</b>
             </span>
           </div>
-          <div class="version-tag">v18</div>
+          <div class="version-tag">v19</div>
         </div>
 
         <div class="side right" id="player3Side">
@@ -2143,13 +2143,14 @@ button.primary {
   let zhVoice = null;
   const playedLog = [];
 
-  /** 缓存中文语音(语音列表异步加载) */
+  /** 缓存中文语音(语音列表异步加载),优先活泼女声 */
   function warmupVoice() {
     if (!("speechSynthesis" in window)) return;
     try {
       const vs = window.speechSynthesis.getVoices();
-      zhVoice = vs.find((v) => v.lang === "zh-CN")
-        || vs.find((v) => v.lang && v.lang.indexOf("zh") === 0)
+      const zh = vs.filter((v) => v.lang === "zh-CN" || (v.lang && v.lang.indexOf("zh") === 0));
+      zhVoice = zh.find((v) => /Huihui|Yaoyao|Xiaoxiao|Tingting|Meijia|Sinji/i.test(v.name))
+        || zh[0]
         || null;
     } catch (e) {
       /* ignore */
@@ -2300,7 +2301,8 @@ button.primary {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "zh-CN";
       if (zhVoice) u.voice = zhVoice;
-      u.rate = 0.95;
+      u.rate = 1.0;
+      u.pitch = 1.1; /* 稍高音调,更活泼 */
       synth.speak(u);
     } catch (e) {
       /* ignore */
