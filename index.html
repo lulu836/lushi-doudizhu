@@ -1182,7 +1182,7 @@ button.primary {
               <i>三</i><b id="score2">0</b>
             </span>
           </div>
-          <div class="version-tag">v11</div>
+          <div class="version-tag">v13</div>
         </div>
 
         <div class="side right" id="player3Side">
@@ -2146,7 +2146,7 @@ button.primary {
       if (!AC) return false;
       ctx = new AC();
       master = ctx.createGain();
-      master.gain.value = 0.25;
+      master.gain.value = 0.35;
       master.connect(ctx.destination);
     }
     if (ctx.state === "suspended") ctx.resume();
@@ -2226,6 +2226,12 @@ button.primary {
     },
     hint() {
       tone({ freq: 1200, dur: 0.03, gain: 0.1 });
+    },
+    select() {
+      tone({ freq: 900, glideTo: 1200, type: "triangle", dur: 0.05, gain: 0.14 });
+    },
+    deselect() {
+      tone({ freq: 700, glideTo: 500, type: "triangle", dur: 0.05, gain: 0.14 });
     },
     flip() {
       tone({ freq: 500, dur: 0.07, gain: 0.15 });
@@ -2533,10 +2539,17 @@ button.primary {
   // 滑动期间只改牌面样式(不重画,不卡顿),松手时一次性同步游戏状态。
   let swipeState = null;
   let suppressTrailingClick = null; // { cardId } 只拦滑动结束后的尾随点击
+  let lastTick = 0;
 
   function toggleCardEl(cardEl, select) {
     if (cardEl.classList.contains("selected") !== select) {
       cardEl.classList.toggle("selected", select);
+      // 选牌轻响(限频,快速滑动时连成清脆的一串)
+      const now = Date.now();
+      if (now - lastTick > 45) {
+        lastTick = now;
+        DDZ.audio.play(select ? "select" : "deselect");
+      }
     }
   }
 
@@ -2959,8 +2972,8 @@ button.primary {
       return;
     }
     if (playerId !== 0 && !state.autoPlay) {
-      // 玩家二/三出牌后停顿 2.5 秒,让玩家看清出的牌
-      schedule(advanceTurn, 2500);
+      // 玩家二/三出牌后停顿 2 秒,让玩家看清出的牌
+      schedule(advanceTurn, 2000);
     } else {
       advanceTurn();
     }
@@ -2969,10 +2982,15 @@ button.primary {
   function toggleSelectCard(cardId) {
     if (state.phase !== "playing" || state.currentTurn !== 0 || state.autoPlay) return;
     const idx = state.selectedCards.findIndex((c) => c.id === cardId);
-    if (idx >= 0) state.selectedCards.splice(idx, 1);
-    else {
+    if (idx >= 0) {
+      state.selectedCards.splice(idx, 1);
+      DDZ.audio.play("deselect");
+    } else {
       const card = state.players[0].hand.find((c) => c.id === cardId);
-      if (card) state.selectedCards.push(card);
+      if (card) {
+        state.selectedCards.push(card);
+        DDZ.audio.play("select");
+      }
     }
     DDZ.ui.renderAll();
   }
