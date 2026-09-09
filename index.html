@@ -359,19 +359,9 @@ body {
 }
 
 /* 中部前景信息浮在背景标题之上 */
-.mid-zone .status-panel,
-.mid-zone .mini-line,
 .mid-zone .human-play {
   position: relative;
   z-index: 1;
-}
-
-.status-panel {
-  font-size: 0.95rem;
-  color: #8a5c0e;
-  font-weight: 800;
-  text-align: center;
-  min-height: 1.2em;
 }
 
 .mini-line {
@@ -381,6 +371,12 @@ body {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--ink-soft);
+}
+
+/* 明牌下方的底分/地主/比分栏:窄列里上下两行排布 */
+.top-center .mini-line {
+  flex-direction: column;
+  gap: 2px;
 }
 
 .mini-line b {
@@ -1099,6 +1095,14 @@ button.primary {
         <div class="top-center">
           <div class="open-cards" id="hiddenCards"></div>
           <div class="multiplier-badge" id="multiplierBadge">×1</div>
+          <div class="mini-line">
+            <span>底分 <b id="baseScore">1</b> · 地主：<b id="landlordName">待定</b></span>
+            <span class="mini-scores">
+              <i>你</i><b id="score0">0</b>
+              <i>二</i><b id="score1">0</b>
+              <i>三</i><b id="score2">0</b>
+            </span>
+          </div>
         </div>
 
         <div class="side right" id="player3Side">
@@ -1123,15 +1127,6 @@ button.primary {
           <span class="title-bottom">斗地主</span>
         </h1>
         <div class="human-play empty" id="humanPlayArea"></div>
-        <div class="status-panel" id="gameStatus">正在开始...</div>
-        <div class="mini-line">
-          <span>底分 <b id="baseScore">1</b> · 地主：<b id="landlordName">待定</b></span>
-          <span class="mini-scores">
-            <i>你</i><b id="score0">0</b>
-            <i>二</i><b id="score1">0</b>
-            <i>三</i><b id="score2">0</b>
-          </span>
-        </div>
       </section>
 
       <!-- 底部操作区：你的手牌 -->
@@ -2201,7 +2196,7 @@ button.primary {
 
   function cache() {
     [
-      "gameStatus", "baseScore", "landlordName", "humanPlayArea", "player2Play", "player3Play",
+      "baseScore", "landlordName", "humanPlayArea", "player2Play", "player3Play",
       "hiddenCards", "player1Hand", "player2Hand", "player3Hand",
       "player1Tag", "player2Tag", "player3Tag",
       "player1Count", "player2Count", "player3Count",
@@ -2390,18 +2385,9 @@ button.primary {
   }
 
   function renderStatus() {
+    // 状态栏已取消(回合信息由金色闪光高亮表示),保留空实现
     const state = stateRef();
-    if (state.phase === "bidding") {
-      el.gameStatus.textContent = state.bid.turn === 0
-        ? `轮到你叫分（当前最高 ${state.bid.currentBid} 分）`
-        : `${state.players[state.bid.turn].name} 正在叫分...`;
-    } else if (state.phase === "settled") {
-      el.gameStatus.textContent = "本局结束";
-    } else if (state.currentTurn === 0) {
-      el.gameStatus.textContent = state.lastPlay ? "轮到你出牌" : "轮到你领出";
-    } else {
-      el.gameStatus.textContent = `${state.players[state.currentTurn].name} 正在出牌...`;
-    }
+    void state;
   }
 
   function updateControls() {
